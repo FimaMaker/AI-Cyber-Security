@@ -1,2 +1,1 @@
-# AI-Cyber-Security-
-Labs and Final Project
+# AI-Cyber-Security Labs and Final Project
