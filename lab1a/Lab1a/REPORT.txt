@@ -1,0 +1,96 @@
+LABORATORY 1a — RULE-BASED SOC DETECTION AND MITRE ATT&CK MAPPING
+Course: AI-Enhanced Cybersecurity — Holon Institute of Technology (HIT)
+Students: Daniel Pinhas; EFIM KARANT
+Date: November 4, 2026
+Environment: Pop!_OS Linux; Docker 29.1.3; Docker Compose 2.40.3
+Source: https://github.com/melofon/HIT-ai-cybersecurity-labs/tree/main/labs/lab1a-mitre-soc
+
+1. OBJECTIVE / ARCHITECTURE
+The lab uses the supplied synthetic logs and a deterministic detector:
+logs/security.log -> detector (5s rescan) -> output/findings.json -> dashboard (:8000).
+Local STIX data enriches rule matches with MITRE ATT&CK metadata. No real attacks
+or network scans were carried out. The detector is rule-based, not AI/LLM.
+
+2. DOCKER VERIFICATION AND INITIAL BASELINE
+Running services shown in docker compose ps:
+- detector: mitre-log-detector (Up)
+- dashboard: lab1a-dashboard (Up; port 8000)
+
+The baseline logs/security.log contained 6 lines; it was backed up as
+logs/security.log.bak. Initial finding_count: 2; MITRE status: Loaded;
+scan_interval_seconds: 5; failed_password_threshold: 3.
+
+T1110: Brute Force / High / IP 172.18.0.5 / 3 failed SSH password events:
+2026-07-11T09:02:11 WARN Failed password for root from 172.18.0.5 port 44231 ssh2
+2026-07-11T09:02:14 WARN Failed password for root from 172.18.0.5 port 44232 ssh2
+2026-07-11T09:02:18 WARN Failed password for root from 172.18.0.5 port 44233 ssh2
+
+T1046: Network Service Discovery / Medium / IP 172.18.0.7:
+2026-07-11T09:04:20 INFO Network scan detected from 172.18.0.7 against ports 22,80,443,3306
+
+Dashboard evidence: images/dashboard-baseline.png (embedded in REPORT.pdf).
+
+3. EVIDENCE -> RULE -> TECHNIQUE -> TACTIC -> UNCERTAINTY
+T1110 / Brute Force / Credential Access:
+Evidence: 3 failed-password lines from 172.18.0.5.
+Rule: at least 3 failed password events grouped by one source IP.
+Uncertainty: no proof of malicious intent or successful access.
+
+T1046 / Network Service Discovery / Discovery:
+Evidence: one explicit network-scan notice from 172.18.0.7.
+Rule: line contains 'network scan detected'.
+Uncertainty: no independent packet-level evidence of a real scan.
+
+4. CONTROLLED EXPERIMENTS — PREDICTION VS ACTUAL
+C1: Removed failed-password line on port 44233, leaving 2 from 172.18.0.5.
+Prediction: 1 finding, T1046 only. Actual: 1, T1046 only.
+Explanation: T1110 threshold of 3 not reached.
+
+C2: Restored three failed-password lines but changed source IPs to
+172.18.0.5, 172.18.0.6, 172.18.0.8 (one failure each).
+Prediction: 1 finding, T1046 only. Actual: 1, T1046 only.
+Explanation: grouping by source IP prevents a global count of three.
+
+C3: Added three failed-password lines from 192.0.2.55:
+2026-10-22T10:01:00Z WARN Failed password for test from 192.0.2.55 port 40001 ssh2
+2026-10-22T10:01:02Z WARN Failed password for test from 192.0.2.55 port 40002 ssh2
+2026-10-22T10:01:04Z WARN Failed password for test from 192.0.2.55 port 40003 ssh2
+Prediction: 2 findings, new T1110 plus existing T1046. Actual: 2.
+Explanation: one new IP reached the threshold.
+
+C4: Added a second scan notice:
+2026-10-22T10:02:00Z INFO Network scan detected from 192.0.2.77 against ports 22,80,443
+Prediction: 3 findings (T1046 x2; T1110 x1). Actual: 3.
+Explanation: another matching scan message created another T1046.
+
+5. MITRE ATT&CK DATA AND SIMULATOR
+The local enterprise-attack-mini.json loaded two STIX techniques:
+T1110 — Credential Access; T1046 — Discovery. Both lookups resolved.
+
+The simulator-stage dashboard screenshot showed finding_count rise from 2 to 3.
+A new T1046 finding appeared for 172.18.0.31, while the original T1046
+172.18.0.7 and T1110 172.18.0.5 remained. Three new raw-log lines visible:
+2026-11-04T18:00:09 INFO User student logged in successfully from 172.18.0.10
+2026-11-04T18:00:19 INFO Network scan detected from 172.18.0.31 against ports 22,80,443,3306
+2026-11-04T18:00:29 INFO User analyst logged in successfully from 172.18.0.11
+
+At the captured moment, the new scan notice led to T1046; no new T1110
+was visible. Unlike controlled edits, the simulator changes the underlying
+log while it is being measured, so results vary between observations.
+Screenshot: images/dashboard-simulator.png (also embedded in REPORT.pdf).
+
+6. SOC NARRATIVE (126 WORDS)
+On 4 November 2026, I tested a rule-based SOC detector in Docker on Pop!_OS. The clean six-line log produced two findings: T1110 (High) after three failed SSH password events from 172.18.0.5, and T1046 (Medium) for an explicit scan notice from 172.18.0.7. In C1, removing one failure eliminated T1110. In C2, distributing failures among three source IPs also avoided the threshold. In C3, three failures from 192.0.2.55 created a new T1110. In C4, a scan notice from 192.0.2.77 added T1046, giving three findings. A later simulator screenshot showed a new T1046 for 172.18.0.31. These observations confirm how the implemented rules classify log text; they do not establish hostile intent, a real scan, successful authentication by an attacker, or compromise. Corroboration would require independent endpoint and network evidence.
+
+7. LIMITATIONS AND CLEANUP
+- T1110 can miss distributed or below-threshold attempts and has no time window.
+- T1046 merely matches explicit scan text, not packet/flow evidence.
+- MITRE mapping indicates consistency with behavior, not confirmed compromise.
+
+Cleanup commands:
+cp logs/security.log.bak logs/security.log
+docker compose --profile simulation down
+
+The submitted GitHub folder includes this TXT report, the README, a PDF,
+and two actual dashboard screenshot files. Experimental source-log edits
+should not be committed.
