@@ -23,15 +23,15 @@ Human activity in a bank fluctuates significantly depending on the time of day. 
 ## 📊 Visual Analysis & Results
 
 ### 1. Bank Traffic Trend Across Operating Zones
-![Traffic Trend](chart_1_traffic_trend.png)
+![Traffic Trend](Images/chart_1_traffic_trend.png)
 * **Insight:** Demonstrates daily traffic curves, clearly separating deep closed hours, restricted staff windows, and high-volume client hours.
 
 ### 2. Statistical Distribution per Zone
-![Distribution](chart_2_distribution.png)
+![Distribution](Images/chart_2_distribution.png)
 * **Insight:** The boxplot visualization highlights the variance and median values within each security zone, capturing baseline behavior and statistical outliers.
 
 ### 3. Isolation Forest Anomaly Detection
-![Isolation Forest](chart_3_isolation_forest.png)
+![Isolation Forest](Images/chart_3_isolation_forest.png)
 * **Insight:** The scatter plot maps model decisions. Blue circles represent normal behavior, while red crossed markers ($\mathbf{X}$) accurately flag contextual security incidents (unauthorized early entries and post-closing breaches).
 
 ---
