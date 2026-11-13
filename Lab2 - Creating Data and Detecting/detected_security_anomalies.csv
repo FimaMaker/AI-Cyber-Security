@@ -1,0 +1,13 @@
+day,hour,people_count,zone,anomaly_score,is_anomaly
+5,4,12,Closed Hours,-1,True
+10,8,39,Client Hours,-1,True
+11,7,38,Client Hours,-1,True
+12,15,18,Closed Hours,-1,True
+12,16,1,Closed Hours,-1,True
+18,8,48,Client Hours,-1,True
+20,7,37,Client Hours,-1,True
+20,16,1,Closed Hours,-1,True
+24,7,37,Client Hours,-1,True
+26,16,1,Closed Hours,-1,True
+27,11,37,Client Hours,-1,True
+30,16,1,Closed Hours,-1,True
