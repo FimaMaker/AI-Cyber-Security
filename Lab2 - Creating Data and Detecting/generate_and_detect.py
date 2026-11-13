@@ -1,131 +1,147 @@
-import pandas as pd
-import numpy as np
-from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import IsolationForest
-import matplotlib.pyplot as plt
-import seaborn as sns
 import os
-import matplotlib.patches as patches
-from matplotlib.lines import Line2D
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from sklearn.ensemble import IsolationForest
 
-N_DAYS = 30
-OUTDIR = "results"
+# Set visual style and random seed for reproducibility
+sns.set_theme(style='whitegrid')
 np.random.seed(42)
 
-if not os.path.exists(OUTDIR):
-    os.makedirs(OUTDIR)
+# Create output directory for datasets and charts
+OUTDIR = 'results'
+os.makedirs(OUTDIR, exist_ok=True)
 
-print("Starting Lab 3: Bank Traffic Anomaly Detection...")
-print("Step 1: Generating synthetic bank traffic data (4AM - 4PM)...")
+print('Step 1: Generating synthetic bank traffic data...')
+days = 30
+hours = list(range(4, 17))  # Observation window from 4:00 AM to 4:00 PM
 
 data = []
-working_hours = range(7, 14)
-staff_hours = [6, 14]
-closed_hours = [4, 5, 15]
+for day in range(1, days + 1):
+  for h in hours:
+    # Define operating rules and traffic expectations based on time
+    if 7 <= h <= 13:  # Client hours (normal peak traffic)
+      count = int(np.random.normal(25, 6))
+      zone = 'Client Hours'
+    elif h in [6, 14]:  # Staff hours (low traffic)
+      count = int(np.random.normal(5, 2))
+      zone = 'Staff Hours'
+    else:  # Closed hours (night / late afternoon)
+      count = int(np.random.exponential(0.5))
+      zone = 'Closed Hours'
 
-for day in range(N_DAYS):
-    for hour in range(4, 16):
-        
-        people_count = 0
-        
-        if hour in working_hours:
-            if hour in [11, 12, 13]:
-                people_count = np.random.poisson(35)
-            else:
-                people_count = np.random.poisson(20)
-                
-        elif hour in staff_hours:
-            people_count = np.random.poisson(5)
-            
-        elif hour in closed_hours:
-            if np.random.rand() < 0.1:
-                people_count = 1
-            else:
-                people_count = 0
-                
-        data.append([day, hour, people_count])
+    # Inject intentional security anomalies for testing the model
+    if day == 5 and h == 4:  # Early morning break-in attempt
+      count = 12
+    elif day == 12 and h == 15:  # Door left unlocked after closing
+      count = 18
+    elif day == 20 and h == 5:  # Predawn suspicious activity
+      count = 5
 
-df = pd.DataFrame(data, columns=["day", "hour", "people_count"])
+    data.append({
+        'day': day,
+        'hour': h,
+        'people_count': max(0, count),
+        'zone': zone,
+    })
 
-print("Step 2: Injecting security anomalies in closed hours...")
+df = pd.DataFrame(data)
 
-injected_anom1 = [5, 4, 8]
-injected_anom2 = [12, 15, 15]
-injected_anom3 = [20, 5, 3]
+print('Step 2: Training Isolation Forest model...')
+X = df[['hour', 'people_count']]
+# Isolation Forest for unsupervised contextual anomaly detection
+model = IsolationForest(contamination=0.03, random_state=42)
+df['anomaly_score'] = model.fit_predict(X)
+df['is_anomaly'] = df['anomaly_score'] == -1
 
-df_anom = pd.DataFrame([injected_anom1, injected_anom2, injected_anom3], columns=df.columns)
-df = pd.concat([df, df_anom], ignore_index=True)
-df = df.sort_values(["day", "hour"]).reset_index(drop=True)
+# Save datasets to CSV files inside the results folder
+df.to_csv(f'{OUTDIR}/raw_bank_traffic.csv', index=False)
+anomalies = df[df['is_anomaly']]
+anomalies.to_csv(f'{OUTDIR}/detected_security_anomalies.csv', index=False)
 
-df.to_csv(f"{OUTDIR}/raw_bank_traffic.csv", index=False)
+print(
+    f'Processed {len(df)} records. Detected {len(anomalies)} security'
+    ' anomalies.'
+)
 
-print("Step 3: Preparing data for ML...")
+print('Step 3: Generating analytical charts...')
 
-cols_for_model = ["hour", "people_count"]
-X = df[cols_for_model]
-
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
-
-print("Step 4: Running Isolation Forest...")
-
-model = IsolationForest(n_estimators=200, contamination=0.015, random_state=42)
-model.fit(X_scaled)
-
-df['decision'] = model.predict(X_scaled)
-df['score'] = model.score_samples(X_scaled)
-
-print(f"Detected {len(df[df['decision'] == -1])} potential anomalies.")
-df[df['decision'] == -1].to_csv(f"{OUTDIR}/detected_security_anomalies.csv", index=False)
-
-print("Step 5: Generating visual explanation...")
-
-plt.figure(figsize=(14, 8))
-sns.set_style("whitegrid")
-
-sns.scatterplot(
+# Chart 1: Daily traffic trend across operating zones
+plt.figure(figsize=(10, 5))
+sns.lineplot(
     data=df,
     x='hour',
     y='people_count',
-    hue='decision',
-    palette={1: '#3498db', -1: '#e74c3c'},
-    alpha=0.5,
-    s=80,
-    x_jitter=0.2
+    hue='zone',
+    marker='o',
+    palette='Set2',
+    linewidth=2.5,
+)
+plt.title('Bank Traffic Trend Across Operating Zones', fontsize=14, weight='bold')
+plt.xlabel('Hour of Day (4 AM - 4 PM)', fontsize=12)
+plt.ylabel('Average People Count', fontsize=12)
+plt.legend(title='Zone Type')
+plt.tight_layout()
+plt.savefig(f'{OUTDIR}/chart_1_traffic_trend.png', dpi=300)
+plt.close()
+
+# Chart 2: Statistical distribution of traffic per security zone
+plt.figure(figsize=(9, 5))
+sns.boxplot(
+    data=df,
+    x='zone',
+    y='people_count',
+    palette='Pastel1',
+    hue='zone',
+    legend=False,
+)
+plt.title('Traffic Distribution per Security Zone', fontsize=14, weight='bold')
+plt.xlabel('Security Zone', fontsize=12)
+plt.ylabel('People Count', fontsize=12)
+plt.tight_layout()
+plt.savefig(f'{OUTDIR}/chart_2_distribution.png', dpi=300)
+plt.close()
+
+# Chart 3: Isolation Forest model decisions (Scatter plot with anomalies highlighted)
+plt.figure(figsize=(11, 6))
+normal = df[~df['is_anomaly']]
+anom = df[df['is_anomaly']]
+
+plt.scatter(
+    normal['hour'],
+    normal['people_count'],
+    c='#3498db',
+    label='Normal Traffic',
+    alpha=0.6,
+    s=40,
+)
+plt.scatter(
+    anom['hour'],
+    anom['people_count'],
+    c='#e74c3c',
+    label='Detected Anomaly',
+    marker='X',
+    s=140,
+    edgecolors='black',
 )
 
-ax = plt.gca()
-rect_work = patches.Rectangle((7, 0), 7, df['people_count'].max()+5, linewidth=0, facecolor='#2ecc71', alpha=0.1, label='Client Hours')
-ax.add_patch(rect_work)
+plt.title(
+    'Isolation Forest: Contextual Security Anomalies Detection',
+    fontsize=14,
+    weight='bold',
+)
+plt.xlabel('Hour of Day (4 AM - 4 PM)', fontsize=12)
+plt.ylabel('Number of People Entered', fontsize=12)
 
-rect_staff1 = patches.Rectangle((6, 0), 1, df['people_count'].max()+5, linewidth=0, facecolor='#f1c40f', alpha=0.1, label='Staff Only')
-rect_staff2 = patches.Rectangle((14, 0), 1, df['people_count'].max()+5, linewidth=0, facecolor='#f1c40f', alpha=0.1)
-ax.add_patch(rect_staff1)
-ax.add_patch(rect_staff2)
+# Highlight operational time zones on the plot
+plt.axvspan(7, 13.5, color='green', alpha=0.08, label='Client Hours (Open)')
+plt.axvspan(5.5, 6.5, color='orange', alpha=0.08, label='Staff Hours')
+plt.axvspan(13.5, 14.5, color='orange', alpha=0.08)
 
-injected_anomalies = df[df.apply(lambda row: [row['day'], row['hour'], row['people_count']] in [injected_anom1, injected_anom2, injected_anom3], axis=1)]
-
-for i, row in injected_anomalies.iterrows():
-    plt.annotate(f"Day {int(row['day'])}\n({int(row['people_count'])} ppl)", 
-                 xy=(row['hour'], row['people_count']),
-                 xytext=(15, 10), textcoords='offset points',
-                 arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0.3', color='black'))
-    
-detected_anoms = df[df['decision'] == -1]
-plt.scatter(detected_anoms['hour'], detected_anoms['people_count'], s=150, linewidth=2, facecolors='none', edgecolors='#c0392b')
-
-plt.title("Bank Physical Security: Human Traffic Anomaly Detection\nIsolation Forest detects violations of operating hours context", fontsize=16)
-plt.xlabel("Hour of Day (4AM - 4PM)", fontsize=12)
-plt.ylabel("Number of People Entered", fontsize=12)
-plt.xticks(range(4, 16))
-
-handles, labels = ax.get_legend_handles_labels()
-custom_lines = [Line2D([0], [0], color='#3498db', marker='o', linestyle=''),
-                Line2D([0], [0], color='#e74c3c', marker='o', linestyle=''),
-                Line2D([0], [0], color='#c0392b', marker='o', linestyle='', markersize=12, markeredgewidth=2, markerfacecolor='none')]
-plt.legend(custom_lines + handles[0:2], ['Normal', 'Detected Anomaly', 'Anomaly Cluster Highlight', 'Client Hours (7-14)', 'Staff Hours (6, 14)'], loc='upper left')
-
+plt.legend(loc='upper right')
 plt.tight_layout()
-plt.savefig(f"{OUTDIR}/bank_traffic_chart.png")
-print(f"Graph saved to {OUTDIR}/bank_traffic_chart.png")
-print("Process complete.")
+plt.savefig(f'{OUTDIR}/chart_3_isolation_forest.png', dpi=300)
+plt.close()
+
+print('All files and 3 charts successfully generated inside the "results/" folder!')
