@@ -5,7 +5,7 @@ Welcome to the central repository for the **AI & Cyber Security** course assignm
 ---
 
 ## 👥 Authors & Team
-* **FimaMaker** 
+* **Efim Karant**
 * **Daniel Pinhas** 
 
 ---
@@ -15,7 +15,7 @@ Welcome to the central repository for the **AI & Cyber Security** course assignm
 | Directory | Topic / Description | Status |
 | :--- | :--- | :---: |
 | [📁 **Lab1**](./Lab1) | From CTI to SOC Investigation & MITRE ATT&CK Mapping | ✅ Completed |
-| 📁 **Lab2** | *Upcoming Lab* | ⏳ In Progress |
+| [📁 **Lab2**](./Lab2) Creating Data and Detecting Anomalies | ✅ Completed |
 | 📁 **Final Project** | *Final Capstone Project* | 📅 Planned |
 
 ---
